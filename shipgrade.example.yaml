@@ -1,0 +1,63 @@
+# shipgrade.example.yaml
+# A worked example config. Copy it to shipgrade.yaml, edit target to point at your LLM
+# feature, then run:
+#   shipgrade scan --config shipgrade.yaml --fail-on high
+# `shipgrade init` writes a minimal version of this file; this one shows more options.
+
+target:
+  # mode is prompt_file | http | callable.
+  #   prompt_file: ref is a path to a system-prompt text file. shipgrade calls a provider
+  #                with it, so set ANTHROPIC_API_KEY or OPENAI_API_KEY; --offline cannot run it.
+  #   http:        ref is the endpoint URL; method, headers, body_template, response_path apply.
+  #   callable:    ref is "module:function" resolvable on your PYTHONPATH.
+  mode: http
+  ref: https://api.example.com/v1/chat
+  # Optional provenance, recorded in the report metadata (carries no secret).
+  target_provider: openai
+  target_model: gpt-4o-mini
+  # HTTP-only fields. {{prompt}} is replaced with each probe input; response_path is the
+  # dotted path to the assistant text in the JSON response.
+  method: POST
+  headers:
+    Authorization: "Bearer ${OPENAI_API_KEY}"
+    Content-Type: "application/json"
+  # {{prompt}} is substituted raw (no JSON escaping), so keep it inside JSON-string quotes.
+  # The target must tolerate raw substitution; a probe input with a quote or backslash can
+  # still produce invalid JSON.
+  body_template: '{"model": "gpt-4o-mini", "input": "{{prompt}}"}'
+  response_path: "choices.0.message.content"
+
+# Probe packs supply the adversarial inputs. owasp-core-v1 is the bundled OWASP pack.
+probe_packs:
+  - owasp-core-v1
+
+# Rule packs supply the pass/fail criteria. The three bundled regulated-domain packs:
+rule_packs:
+  - finance-v1
+  - health-v1
+  - edu-v1
+
+# Report formats to emit. cli prints to the terminal; html, json, sarif write files.
+outputs:
+  - cli
+  - html
+  - json
+  - sarif
+
+# Fail the run when any non-waived finding scores at or above this severity (0.0 to 10.0).
+gate_severity: 7.0
+
+# Accepted-risk waivers live in a separate .shipgrade-ignore.yaml, passed with
+# --ignore-file. Each waiver is keyed on a Finding.fingerprint (32 hex chars, copy it
+# from the report) and carries a plain-English reason and an optional expires date. A
+# waived finding still renders as accepted risk with its reason; it is excluded from the
+# gate but never silently dropped. Copy the block below into .shipgrade-ignore.yaml:
+#
+# --- example .shipgrade-ignore.yaml (BEGIN) ---
+# waivers:
+#   - fingerprint: 944668538602013a3814e5d5089fadca
+#     reason: Internal sandbox target, not user-facing. Tracked in JIRA-1234.
+#     expires: 2026-12-31
+#   - fingerprint: 0123456789abcdef0123456789abcdef
+#     reason: Accepted by compliance 2026-06-01, disclaimer added downstream.
+# --- example .shipgrade-ignore.yaml (END) ---

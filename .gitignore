@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env / secrets
+.env
+.env.*
+
+# OS
+.DS_Store
+**/.DS_Store
+
+# Runtime artifacts (written by scan/demo)
+/.shipgrade/
+/badge.json
+/shipgrade-report.html
+/shipgrade-report.json
+/shipgrade.sarif

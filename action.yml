@@ -1,0 +1,138 @@
+name: shipgrade
+description: >-
+  Audit an LLM feature for product-safety and regulated-domain compliance, upload SARIF to
+  the Security tab, and gate the build on the safety grade.
+
+# Minimum permissions the calling workflow must grant for this action:
+#   permissions:
+#     security-events: write   # upload SARIF to the code-scanning Security tab
+#     contents: read           # check out the repository
+# The action requests no write on contents and uploads SARIF before any gate-driven exit
+# (spec 6.2), so a failing gate never hides findings from the Security tab.
+
+inputs:
+  config:
+    description: Path to the shipgrade config (shipgrade.yaml). Must list sarif in outputs to upload.
+    required: false
+    default: shipgrade.yaml
+  fail-on:
+    description: "Gate severity band: critical, high, medium, or low. Overrides gate_severity."
+    required: false
+    default: high
+  outputs:
+    description: Informational only; SARIF output is driven by the config outputs list.
+    required: false
+    default: sarif
+  ignore-file:
+    description: Path to a .shipgrade-ignore.yaml of accepted-risk waivers (spec 6.1).
+    required: false
+    default: ""
+  sarif-file:
+    description: >-
+      Path the SARIF upload reads. The scan CLI always writes shipgrade.sarif; the action
+      relocates it to this path when it differs, so a non-default value still uploads.
+    required: false
+    default: shipgrade.sarif
+  upload-sarif:
+    description: Upload the SARIF file to the Security tab. Set false to skip the upload.
+    required: false
+    default: "true"
+  category:
+    description: SARIF upload category, so re-runs collapse onto one alert set (spec 6.2).
+    required: false
+    default: shipgrade
+
+outputs:
+  score:
+    description: The AI Safety Score (0 to 100) from the scan.
+    value: ${{ steps.scan.outputs.score }}
+  grade:
+    description: The letter grade (A to F) from the scan.
+    value: ${{ steps.scan.outputs.grade }}
+  sarif-path:
+    description: The SARIF file path the scan wrote.
+    value: ${{ steps.scan.outputs.sarif-path }}
+  findings-count:
+    description: The number of findings in the report.
+    value: ${{ steps.scan.outputs.findings-count }}
+
+runs:
+  using: composite
+  steps:
+    - name: Run shipgrade scan
+      id: scan
+      shell: bash
+      # Inputs reach shell only via env: to prevent script injection (spec 11.3). A
+      # ${{ inputs.* }} in a run: block would let a crafted value inject arbitrary shell
+      # commands or forge workflow commands via CR/LF in GITHUB_OUTPUT writes.
+      env:
+        CONFIG: ${{ inputs.config }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        IGNORE_FILE: ${{ inputs.ignore-file }}
+        SARIF_FILE: ${{ inputs.sarif-file }}
+      run: |
+        set +e
+        # Reject CR or LF in path inputs before they are used in shell commands or written
+        # to GITHUB_OUTPUT. A CR/LF in a value written to GITHUB_OUTPUT can forge workflow
+        # commands (e.g. "key=val\n::set-env name=...").
+        case "$CONFIG" in *$'\n'*|*$'\r'*) echo "::error title=shipgrade::CONFIG contains CR or LF"; exit 1;; esac
+        case "$IGNORE_FILE" in *$'\n'*|*$'\r'*) echo "::error title=shipgrade::IGNORE_FILE contains CR or LF"; exit 1;; esac
+        case "$SARIF_FILE" in *$'\n'*|*$'\r'*) echo "::error title=shipgrade::SARIF_FILE contains CR or LF"; exit 1;; esac
+        ignore_flag=()
+        [ -n "$IGNORE_FILE" ] && ignore_flag=(--ignore-file "$IGNORE_FILE")
+        uvx shipgrade scan \
+          --config "$CONFIG" \
+          --fail-on "$FAIL_ON" \
+          --yes \
+          "${ignore_flag[@]}"
+        code=$?
+        echo "shipgrade-scan-exit-code=$code" >> "$GITHUB_OUTPUT"
+        # The scan CLI always writes the fixed path shipgrade.sarif. When the consumer asks
+        # for a different sarif-file, relocate it there so the upload step (which reads
+        # sarif-file) finds it. This keeps a single source of truth for what the CLI writes
+        # while making the sarif-file input real for any value.
+        sarif_file="$SARIF_FILE"
+        if [ -f "shipgrade.sarif" ] && [ "$sarif_file" != "shipgrade.sarif" ]; then
+          mkdir -p "$(dirname "$sarif_file")"
+          mv "shipgrade.sarif" "$sarif_file"
+        fi
+        echo "sarif-path=$sarif_file" >> "$GITHUB_OUTPUT"
+        report="shipgrade-report.json"
+        if [ -f "$report" ]; then
+          python3 - "$report" >> "$GITHUB_OUTPUT" <<'PY'
+        import json, sys
+        data = json.load(open(sys.argv[1], encoding="utf-8"))
+        report = data["report"]
+        score = report["score"]
+        print(f"score={score['score']}")
+        print(f"grade={score['grade']}")
+        print(f"findings-count={len(report['findings'])}")
+        PY
+        else
+          # score/grade/findings-count read shipgrade-report.json, which the scan writes only
+          # when the config's outputs list contains json. Without it those outputs resolve to
+          # empty strings; warn loudly so the consumer fixes the config instead of wiring a
+          # blank value into a later step.
+          echo "::warning title=shipgrade::No shipgrade-report.json found; the score, grade, and findings-count outputs are empty. Add 'json' to the outputs list in your shipgrade config to populate them."
+        fi
+
+    - name: Upload SARIF to the Security tab
+      # always() so a failing gate (the scan set a non-zero status) never suppresses the
+      # upload; inputs are strings in a composite action, so gate on the literal 'true' to
+      # honor upload-sarif: false (doc 14).
+      if: always() && inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3
+      with:
+        sarif_file: ${{ inputs.sarif-file }}
+        category: ${{ inputs.category }}
+
+    - name: Apply the safety gate
+      shell: bash
+      # Receive the scan exit code via env: rather than ${{ steps.* }} interpolation to
+      # keep steps context out of shell (same injection-safe pattern as the scan step).
+      env:
+        SCAN_CODE: ${{ steps.scan.outputs.shipgrade-scan-exit-code }}
+      run: |
+        code="$SCAN_CODE"
+        echo "shipgrade scan exited with code $code"
+        exit "$code"

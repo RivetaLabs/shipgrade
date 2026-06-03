@@ -1,0 +1,31 @@
+# Published pre-commit hook for shipgrade (spec 6.2). A consumer adds this to their
+# .pre-commit-config.yaml to gate commits on the AI safety grade.
+#
+# IMPORTANT: `shipgrade scan` requires `--config PATH` (the path is repo-specific, so it
+# cannot ship in this manifest). This manifest's `args` carry only the flags that must
+# never change (--offline, --fail-on high); the consumer supplies the config path. Because
+# pre-commit REPLACES a hook's manifest `args` with the consumer's `args` (it does not
+# append), the consumer must re-state every flag, including the safety flags:
+#
+#   repos:
+#     - repo: https://github.com/RivetaLabs/Shipgrade
+#       rev: v0.1.0
+#       hooks:
+#         - id: shipgrade
+#           args: ["--offline", "--fail-on", "high", "--config", "shipgrade.yaml"]
+#
+# Run `shipgrade init` first to write shipgrade.yaml at the repo root. Omitting `args`
+# leaves the manifest default (no --config) and the hook exits 2 (Missing option
+# '--config'); the snippet above is the supported, turnkey invocation.
+#
+# The hook runs offline (no API key, no network egress) and blocks the commit when any
+# finding bands high or above. Add the "ci: skip" line in .pre-commit-config.yaml so a
+# pre-commit.ci run does not double-run it.
+- id: shipgrade
+  name: shipgrade AI safety gate
+  description: Grade the LLM feature offline and block the commit on a high-or-critical finding.
+  entry: shipgrade scan
+  language: python
+  pass_filenames: false
+  args: ["--offline", "--fail-on", "high"]
+  stages: [pre-commit]

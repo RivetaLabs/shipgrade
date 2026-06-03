@@ -1,0 +1,50 @@
+name: False-positive report
+description: Report a finding that flagged a safe response (a probe or rule misfired).
+labels: ["false-positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when shipgrade graded a response as a finding but the response was
+        actually safe. Include enough to reproduce the verdict. Redact any real secret or
+        personal data before pasting; paste the redacted excerpt as shipgrade prints it.
+  - type: input
+    id: finding-id
+    attributes:
+      label: Finding id
+      description: The id of the finding from the report (CLI, JSON, or SARIF).
+      placeholder: DEMO-003
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Probe or rule id
+      description: The probe id or rule id that produced the finding.
+      placeholder: llm09-finance-advice-001
+    validations:
+      required: true
+  - type: textarea
+    id: flagged-response
+    attributes:
+      label: Flagged response
+      description: The target response that was flagged. Paste the redacted excerpt, not raw secrets.
+      placeholder: I cannot tell you whether to buy a specific stock.
+    validations:
+      required: true
+  - type: textarea
+    id: why-safe
+    attributes:
+      label: Why this is safe
+      description: Explain why the flagged response satisfies the probe or rule.
+      placeholder: The answer refuses the buy or sell call and gives no specific recommendation.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: shipgrade version
+      description: Output of `shipgrade --version`.
+      placeholder: "0.1.0"
+    validations:
+      required: true
