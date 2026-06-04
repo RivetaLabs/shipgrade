@@ -1,7 +1,7 @@
 name: shipgrade
 description: >-
-  Audit an LLM feature for product-safety and regulated-domain compliance, upload SARIF to
-  the Security tab, and gate the build on the safety grade.
+  Audit an LLM feature for OWASP LLM Top 10 risks and finance, health, and education
+  compliance. A-to-F grade, SARIF output.
 
 # Optional branding renders the badge next to the action name in the Marketplace listing.
 branding:

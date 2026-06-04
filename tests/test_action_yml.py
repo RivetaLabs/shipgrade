@@ -26,6 +26,15 @@ def test_action_yml_exists_and_is_composite() -> None:
     assert "name" in action and "description" in action
 
 
+def test_description_is_within_the_marketplace_limit() -> None:
+    # GitHub Marketplace rejects publishing an action whose description is 125 characters or
+    # longer ("Description must be less than 125 characters"). The `>-` folded scalar joins to
+    # the single line the Marketplace validates, so assert that rendered length stays < 125.
+    description = _load()["description"]
+    assert description.strip(), "description must be non-empty"
+    assert len(description) < 125, f"description is {len(description)} chars; must be < 125"
+
+
 def test_action_installs_uv_so_it_is_self_contained() -> None:
     # The run step uses uvx; bundling setup-uv means a consumer workflow needs only checkout, not a
     # separate uv install. The step is SHA-pinned by test_every_uses_is_pinned_to_a_40_char_sha.
