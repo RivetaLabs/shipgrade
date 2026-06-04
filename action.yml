@@ -3,6 +3,11 @@ description: >-
   Audit an LLM feature for product-safety and regulated-domain compliance, upload SARIF to
   the Security tab, and gate the build on the safety grade.
 
+# Optional branding renders the badge next to the action name in the Marketplace listing.
+branding:
+  icon: shield
+  color: green
+
 # Minimum permissions the calling workflow must grant for this action:
 #   permissions:
 #     security-events: write   # upload SARIF to the code-scanning Security tab
@@ -59,6 +64,9 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Install uv
+      # The action runs uvx, so it installs uv itself; a consumer workflow needs only checkout.
+      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
     - name: Run shipgrade scan
       id: scan
       shell: bash
@@ -80,7 +88,7 @@ runs:
         case "$SARIF_FILE" in *$'\n'*|*$'\r'*) echo "::error title=shipgrade::SARIF_FILE contains CR or LF"; exit 1;; esac
         ignore_flag=()
         [ -n "$IGNORE_FILE" ] && ignore_flag=(--ignore-file "$IGNORE_FILE")
-        uvx shipgrade scan \
+        uvx --from shipgrade==0.1.1 shipgrade scan \
           --config "$CONFIG" \
           --fail-on "$FAIL_ON" \
           --yes \
@@ -121,7 +129,7 @@ runs:
       # upload; inputs are strings in a composite action, so gate on the literal 'true' to
       # honor upload-sarif: false (doc 14).
       if: always() && inputs.upload-sarif == 'true'
-      uses: github/codeql-action/upload-sarif@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3
+      uses: github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v3
       with:
         sarif_file: ${{ inputs.sarif-file }}
         category: ${{ inputs.category }}

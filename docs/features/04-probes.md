@@ -1,7 +1,7 @@
 ---
 title: Probe Packs and the YAML Load Chokepoint
-version: 1.3.3
-last_updated: 2026-06-02
+version: 1.3.4
+last_updated: 2026-06-03
 depends_on: [01-finding-contract.md]
 related: [03-adapters.md, 08-domain-rule-packs.md, 09-severity-and-mapping.md]
 status: current
@@ -23,11 +23,13 @@ toc: [data-model, public-interface, output-surface, business-rules, failure-mode
   a `SafeLoader` that also bans anchors/aliases, a 1 MB byte cap, then Pydantic validation
   with `extra="forbid"`. Probe categories are locked to the v1 five by the `OwaspLlmId`
   type. `atlas_technique` ids are verified against the live MITRE ATLAS matrix. A
-  `target_rule` binding is validated against the loaded rule packs at scan assembly: a
+  `target_rule` binding is validated against the loaded rule packs before any probe runs: a
   missing rule id, a category mismatch, or a duplicate rule id across packs fails the run
-  (`BindingError`, doc 09), never a silent mis-citation.
+  fast (`BindingError`, doc 09), before any API spend, and is re-checked at findings assembly
+  as a net, never a silent mis-citation.
 - **Verification:** `tests/test_yaml_loader.py`, `tests/test_probe_loader.py`,
-  `tests/test_probe_pack_owasp_core.py`, `tests/test_scan.py` (binding validation).
+  `tests/test_probe_pack_owasp_core.py`, `tests/test_scan.py` (binding validation, including
+  the pre-scan fail-fast).
 - **Known gaps:** Rule packs (M6) reuse the same chokepoint but are not built here. The
   per-category allocation (spec 5.2) is fully authored at 26 probes (LLM09 7, LLM07 5,
   LLM02 7, LLM01 4, LLM05 3). EDU-006 and EDU-007 (the LLM09 edu rules) have no authored

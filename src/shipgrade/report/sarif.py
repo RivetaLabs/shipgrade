@@ -33,8 +33,8 @@ _LEVEL = {"critical": "error", "high": "error", "medium": "warning", "low": "not
 
 _OWASP_TAXONOMY = "OWASP-LLM-Top-10-2025"
 _ATLAS_TAXONOMY = "MITRE-ATLAS"
-_TOOL_VERSION = "0.1.0"
-_INFO_URI = "https://github.com/RivetaLabs/Shipgrade"
+_TOOL_VERSION = "0.1.1"
+_INFO_URI = "https://github.com/RivetaLabs/shipgrade"
 _SARIF_DISCLAIMER = (
     "Findings are behavioral observations of an LLM feature's responses, not static "
     "defects in source lines. Severity is a CVSS-flavored 0-10 adaptation for LLM "

@@ -62,6 +62,40 @@ def test_run_scan_against_callable_target(tmp_path, monkeypatch):
     assert results[0].judged_by == "none"
 
 
+def test_run_scan_fails_fast_on_unresolved_binding_before_running_probes(tmp_path, monkeypatch):
+    # A bound probe whose target_rule is in no loaded rule pack must abort the run BEFORE any
+    # probe executes, so a mis-paired config errors in under a second instead of after a full
+    # paid scan (the latent bug the real-world gallery exposed: owasp-core-v1 binds rules in
+    # three domains, but a config that loads one rule pack only crashed post-scan).
+    calls: list[str] = []
+
+    async def respond(prompt):
+        calls.append(prompt)
+        return f"echo: {prompt}"
+
+    _install_target(monkeypatch, respond=respond)
+    pack = tmp_path / "bound.yaml"
+    pack.write_text(
+        "name: bound\nversion: '1.0.0'\nprobes:\n"
+        "  - id: llm09-x-001\n    category: LLM09\n    atlas_technique: null\n    title: t\n"
+        "    inputs: ['a']\n    safe_behavior: 's'\n    target_rule: FIN-001\n",
+        encoding="utf-8",
+    )
+    cfg = Config(
+        target=Target(mode="callable", ref="scantarget:respond"),
+        judge_provider=None,
+        judge_model=None,
+        probe_packs=[str(pack)],
+        rule_packs=[],  # FIN-001 is bound but no rule pack is loaded
+        outputs=["cli"],
+        gate_severity=7.0,
+    )
+    with pytest.raises(BindingError) as exc:
+        asyncio.run(run_scan(cfg))
+    assert "FIN-001" in str(exc.value)
+    assert calls == [], "fail-fast: no probe may run before the binding check"
+
+
 def test_run_scan_prompt_file_uses_the_model_caller(tmp_path, monkeypatch):
     # A1: a prompt_file scan reads the system-prompt file and calls the injected ModelCaller
     # with (file contents as system, probe input as prompt); the result is "ok" (judged).
@@ -386,7 +420,12 @@ def test_cli_scan_judge_bound_prints_one_consent_line(tmp_path, monkeypatch):
                 "confidence": "high",
             }
 
-    monkeypatch.setattr(cli_mod, "select_judge", lambda cfg: (_Judge(), "anthropic"), raising=False)
+    monkeypatch.setattr(
+        cli_mod,
+        "select_judge",
+        lambda cfg: (_Judge(), "anthropic", "claude-judge-test"),
+        raising=False,
+    )
     cfg_path = _write_config(tmp_path, _mini_pack(tmp_path))
     result = CliRunner().invoke(app, ["scan", "--config", str(cfg_path), "--yes"])
     assert result.exit_code == 0

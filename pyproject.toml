@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "shipgrade"
-version = "0.1.0"
+version = "0.1.1"
 description = "Grade your LLM feature before you ship: a plain-English, severity-ranked A-to-F safety and regulated-domain compliance report card."
 requires-python = ">=3.11"
 license = "MIT"
@@ -14,7 +14,9 @@ keywords = [
     "ai-security",
     "prompt-injection",
     "system-prompt-leakage",
+    "owasp",
     "owasp-llm",
+    "compliance",
     "ai-compliance",
     "llm-evaluation",
     "sarif",
@@ -48,10 +50,10 @@ dependencies = [
 shipgrade = "shipgrade.cli:main"
 
 [project.urls]
-Documentation = "https://github.com/RivetaLabs/Shipgrade#readme"
-Source = "https://github.com/RivetaLabs/Shipgrade"
-Issues = "https://github.com/RivetaLabs/Shipgrade/issues"
-Security = "https://github.com/RivetaLabs/Shipgrade/blob/main/SECURITY.md"
+Documentation = "https://github.com/RivetaLabs/shipgrade#readme"
+Source = "https://github.com/RivetaLabs/shipgrade"
+Issues = "https://github.com/RivetaLabs/shipgrade/issues"
+Security = "https://github.com/RivetaLabs/shipgrade/blob/main/SECURITY.md"
 
 [dependency-groups]
 dev = [

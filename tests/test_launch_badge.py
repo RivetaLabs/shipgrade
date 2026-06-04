@@ -58,3 +58,16 @@ def test_committed_clean_badge_matches_clean_pass_score(tmp_path):
     assert committed == expected
     assert committed["message"] == "A"
     assert committed["color"] == "brightgreen"
+
+
+def test_readme_ci_section_is_complete():
+    # The action uploads SARIF and reads shipgrade-report.json, so the CI section must grant
+    # security-events: write and tell the reader their config needs sarif (and json) in outputs.
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    assert "## Use in CI" in readme
+    start = readme.index("## Use in CI")
+    section = readme[start : readme.index("\n## ", start + 1)]
+    assert "security-events: write" in section
+    assert "RivetaLabs/shipgrade@" in section
+    assert "sarif" in section  # SARIF output required for the upload
+    assert "json" in section  # JSON output required for the score/grade/findings-count outputs

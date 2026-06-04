@@ -140,6 +140,14 @@ async def run_scan(
     sanitized_identity = summarize_target(config.target).identity
     # Authored probes first (so their result positions are stable), then synthetic rule seeds.
     executed_probes = [probe for pack in packs for probe in pack.probes] + _seed_probes(rule_packs)
+    # Fail fast on an invalid probe->rule binding BEFORE any probe runs, so a mis-paired config
+    # (a bound probe whose rule pack is not loaded) errors in well under a second instead of
+    # after a full paid scan (spec 5.8). findings_from_results re-checks the same invariants on
+    # the results as a defense-in-depth net.
+    binding_index = _index_rules(rule_packs)
+    for probe in executed_probes:
+        if probe.target_rule is not None:
+            _bound_rule(probe, binding_index)
     results: list[ProbeResult] = []
     for probe in executed_probes:
         rubric = rubric_map.get(probe.category, "")

@@ -8,7 +8,7 @@
 # append), the consumer must re-state every flag, including the safety flags:
 #
 #   repos:
-#     - repo: https://github.com/RivetaLabs/Shipgrade
+#     - repo: https://github.com/RivetaLabs/shipgrade
 #       rev: v0.1.0
 #       hooks:
 #         - id: shipgrade

@@ -4,7 +4,7 @@
   {
     "meta": {
       "schema": "shipgrade-report-v1",
-      "tool_version": "0.1.0",
+      "tool_version": "0.1.1",
       "scale_version": "shipgrade-1",
       "run_date": "2026-06-01",
       "disclaimer": "shipgrade is an automated heuristic audit, not a certification, security guarantee, or legal or compliance sign-off. The grade reflects the probes that ran on this date; a higher grade means fewer detected issues, not proven safety.",
@@ -14,7 +14,7 @@
     "waivers": [],
     "report": {
       "metadata": {
-        "tool_version": "0.1.0",
+        "tool_version": "0.1.1",
         "run_id": "demo-run",
         "started_at": "2026-06-01T12:00:00",
         "target": {

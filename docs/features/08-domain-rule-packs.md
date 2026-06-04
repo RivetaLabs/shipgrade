@@ -1,7 +1,7 @@
 ---
 title: Domain Rule Packs and the Rule DSL
-version: 1.3.1
-last_updated: 2026-06-02
+version: 1.3.2
+last_updated: 2026-06-03
 depends_on: [01-finding-contract, 04-probes, 07-llm-judge]
 related: [02-report-core, 09-severity-and-mapping, 13-data-handling]
 status: current
@@ -15,7 +15,7 @@ toc: [Data Model, Public Interface, Output surface, Business Rules, Failure Mode
 > description cites `rule.rationale`, and the fingerprint uses `rule.id` in the `rule_id`
 > slot. An unbound probe takes the probe-only path (doc 09): no rule citation, an empty
 > `rule_id` slot. `source = "shipgrade"` on both. A malformed pack fails fast at load, never
-> silently drops a rule; an invalid `target_rule` binding fails fast at scan assembly.
+> silently drops a rule; an invalid `target_rule` binding fails fast before any probe runs.
 
 ## TLDR
 

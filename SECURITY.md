@@ -19,7 +19,7 @@ Report a security vulnerability privately. Do not open a public issue.
 
 Use GitHub Security Advisories: open the repository Security tab and click "Report a
 vulnerability", or go directly to
-https://github.com/RivetaLabs/Shipgrade/security/advisories/new.
+https://github.com/RivetaLabs/shipgrade/security/advisories/new.
 
 shipgrade is maintained by one person. Expect an initial response within 7 days. There is
 no paid support tier and no guaranteed patch timeline.
@@ -54,7 +54,7 @@ shipgrade publishes to PyPI through Trusted Publishing with PEP 740 build attest
 verify a downloaded wheel against its provenance, run:
 
 ```bash
-gh attestation verify <wheel> --repo RivetaLabs/Shipgrade
+gh attestation verify <wheel> --repo RivetaLabs/shipgrade
 ```
 
 This verifies the published wheel against its PEP 740 build provenance: GitHub OIDC

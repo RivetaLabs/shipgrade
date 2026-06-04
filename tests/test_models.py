@@ -150,7 +150,7 @@ def test_baseline_stores_fingerprints_not_evidence():
     b = Baseline(
         schema_version=1,
         created_at=datetime(2026, 6, 1, 12, 0, 0),
-        tool_version="0.1.0",
+        tool_version="0.1.1",
         fingerprints=["0" * 32],
         score=_score(),
     )
@@ -214,7 +214,7 @@ def test_report_envelope_composes():
     )
     report = Report(
         metadata=RunMetadata(
-            tool_version="0.1.0",
+            tool_version="0.1.1",
             run_id="run-1",
             started_at=datetime(2026, 6, 1, 12, 0, 0),
             target=TargetSummary(mode="prompt_file", identity="system_prompt.txt"),

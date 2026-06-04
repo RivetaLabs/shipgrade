@@ -23,7 +23,7 @@ def test_help_lists_the_three_commands():
 def test_version_flag():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "0.1.0" in result.output
+    assert "0.1.1" in result.output
 
 
 def test_scan_stub_exits_nonzero():
@@ -158,6 +158,48 @@ def test_scan_writes_chosen_report_files(tmp_path, monkeypatch):
     assert payload["report"]["score"]["scale_version"] == "shipgrade-1"
 
 
+def test_scan_records_the_resolved_judge_in_metadata(tmp_path, monkeypatch):
+    # Regression: the report metadata must record the judge that ACTUALLY ran, not just an
+    # explicit judge_provider override. A config that selects the judge by env key (no
+    # explicit judge_provider) still runs an LLM judge, so judge_provider must not read
+    # "none" (which the offline demo uses to mean "no LLM judge ran") and judge_model must
+    # carry the resolved model, not None.
+    monkeypatch.chdir(tmp_path)
+    import shipgrade.cli as cli_mod
+
+    class _Judge:
+        async def get_verdict_args(self, *, system, user_text, tool_schema):
+            return {
+                "passed": False,
+                "severity_score": 9.5,
+                "rationale": "named a security to buy",
+                "suggested_fix": "refuse",
+                "confidence": "high",
+            }
+
+    # select_judge resolves (client, provider, model); the config below sets no judge_provider.
+    monkeypatch.setattr(
+        cli_mod,
+        "select_judge",
+        lambda cfg: (_Judge(), "anthropic", "claude-judge-test"),
+        raising=False,
+    )
+
+    async def respond(prompt):
+        return "Yes, buy NVDA now."
+
+    _install_callable_target(monkeypatch, respond)
+    rule_pack = _write_finance_rule_pack(tmp_path)
+    cfg_path = _write_scan_config_with_rules(tmp_path, rule_pack)
+    result = runner.invoke(app, ["scan", "--config", str(cfg_path), "--yes", "--fail-on", "high"])
+    assert result.exit_code == 1
+    metadata = json.loads(Path("shipgrade-report.json").read_text(encoding="utf-8"))["report"][
+        "metadata"
+    ]
+    assert metadata["judge_provider"] == "anthropic"
+    assert metadata["judge_model"] == "claude-judge-test"
+
+
 def _write_scan_config_with_rules(dir_path: Path, rule_pack_path: str) -> Path:
     pack = dir_path / "mini.yaml"
     pack.write_text(
@@ -216,7 +258,12 @@ def _bind_failing_judge(monkeypatch) -> None:
                 "confidence": "high",
             }
 
-    monkeypatch.setattr(cli_mod, "select_judge", lambda cfg: (_Judge(), "anthropic"), raising=False)
+    monkeypatch.setattr(
+        cli_mod,
+        "select_judge",
+        lambda cfg: (_Judge(), "anthropic", "claude-judge-test"),
+        raising=False,
+    )
 
 
 def _bind_passing_judge(monkeypatch) -> None:
@@ -232,7 +279,12 @@ def _bind_passing_judge(monkeypatch) -> None:
                 "confidence": "high",
             }
 
-    monkeypatch.setattr(cli_mod, "select_judge", lambda cfg: (_Judge(), "anthropic"), raising=False)
+    monkeypatch.setattr(
+        cli_mod,
+        "select_judge",
+        lambda cfg: (_Judge(), "anthropic", "claude-judge-test"),
+        raising=False,
+    )
 
 
 def test_scan_clean_run_exits_zero(tmp_path, monkeypatch):

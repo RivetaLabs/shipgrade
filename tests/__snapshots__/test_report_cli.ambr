@@ -45,7 +45,7 @@
   
   shipgrade is an automated heuristic audit, not a certification, security guarantee, or legal or compliance sign-off. The grade reflects the probes that ran on this date; a higher grade means fewer detected issues, not proven safety.
   Severity is a CVSS-flavored 0-10 adaptation for LLM behavior, not CVSS-proper. EPSS and KEV are intentionally excluded.
-  tool 0.1.0  run 2026-06-01  scale shipgrade-1
+  tool 0.1.1  run 2026-06-01  scale shipgrade-1
   
   '''
 # ---

@@ -150,7 +150,7 @@ def make_demo_report() -> Report:
         probes_skipped=0,
     )
     metadata = RunMetadata(
-        tool_version="0.1.0",
+        tool_version="0.1.1",
         run_id="demo-run",
         started_at=datetime(2026, 6, 1, 12, 0, 0),
         target=TargetSummary(mode="prompt_file", identity="system_prompt.txt"),

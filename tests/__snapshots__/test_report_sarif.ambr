@@ -9,8 +9,8 @@
         "tool": {
           "driver": {
             "name": "shipgrade",
-            "version": "0.1.0",
-            "informationUri": "https://github.com/RivetaLabs/Shipgrade",
+            "version": "0.1.1",
+            "informationUri": "https://github.com/RivetaLabs/shipgrade",
             "rules": [
               {
                 "id": "LLM01",

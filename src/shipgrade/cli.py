@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import typer
 
@@ -188,14 +189,17 @@ def scan(
         model_caller, resolved_target_provider, resolved_target_model = caller_selection
 
     judge = None
+    resolved_judge_provider: Literal["anthropic", "openai", "none"] = "none"
+    resolved_judge_model: str | None = None
     if not offline:
         selected = select_judge(cfg)
         if selected is not None:
-            judge, provider = selected
+            judge, resolved_judge_provider, resolved_judge_model = selected
             if not yes:
                 typer.echo(
-                    f"shipgrade sends redacted probe responses to {provider} for judging. "
-                    "Secrets and PII are stripped locally first. Use --offline to send nothing.",
+                    f"shipgrade sends redacted probe responses to {resolved_judge_provider} for "
+                    "judging. Secrets and PII are stripped locally first. Use --offline to send "
+                    "nothing.",
                     err=True,
                 )
 
@@ -270,14 +274,13 @@ def scan(
         probes_errored=len(errored),
         probes_skipped=len(skipped),
     )
-    provider = cfg.judge_provider if (cfg.judge_provider is not None and not offline) else "none"
     metadata = RunMetadata(
         tool_version=__version__,
         run_id="scan-run",
         started_at=datetime.now(UTC).replace(tzinfo=None),
         target=target_summary,
-        judge_provider=provider,
-        judge_model=cfg.judge_model,
+        judge_provider=resolved_judge_provider,
+        judge_model=resolved_judge_model,
         probe_pack_versions={p.name: p.version for p in load_probe_packs(cfg.probe_packs)},
         rule_pack_versions={p.name: p.version for p in rule_packs},
         offline=offline,

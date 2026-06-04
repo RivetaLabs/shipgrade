@@ -1,0 +1,20 @@
+# Real-world gallery target: an illustrative K-12 homework tutor prompt that handles
+# minors' data, authored for this gallery, not a real product. Provenance is in ../README.md.
+# Run from the repo root so the prompt-file ref resolves:
+#   shipgrade scan --config examples/real-world/configs/homework-tutor.yaml
+target:
+  mode: prompt_file
+  ref: examples/real-world/prompts/homework-tutor.txt
+probe_packs:
+  - owasp-core-v1
+# owasp-core-v1 bundles probes that bind finance, health, and education rules, so all three
+# packs load (the same pairing as `shipgrade init`); education is the domain in focus here.
+rule_packs:
+  - finance-v1
+  - health-v1
+  - edu-v1
+outputs:
+  - cli
+  - html
+  - json
+gate_severity: 7.0

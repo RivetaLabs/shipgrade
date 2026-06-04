@@ -1,7 +1,7 @@
 ---
 title: CI Action and Suppression
-version: 1.1.0
-last_updated: 2026-06-02
+version: 1.3.0
+last_updated: 2026-06-03
 depends_on: [01-finding-contract, 11-regression-mode, 12-cli-and-ci-gate]
 related: [02-report-core, 04-probes, 10-ai-safety-score]
 status: current
@@ -21,16 +21,21 @@ toc: [Data Model, Public Interface, Output surface, Business Rules, Failure Mode
 > pre-commit hook runs `shipgrade scan --offline --fail-on high`, key-free and network-free;
 > every `run:` block in `action.yml` is free of `${{ inputs.* }}` and `${{ steps.* }}`
 > interpolation -- user-controlled values reach shell only via `env:` mapping, and path
-> inputs are validated for CR/LF before use or `$GITHUB_OUTPUT` writes.
+> inputs are validated for CR/LF before use or `$GITHUB_OUTPUT` writes; the action installs
+> `uv` itself via one SHA-pinned `astral-sh/setup-uv` step so a consumer workflow needs only
+> `checkout`, and the run step pins the package with `uvx --from shipgrade==<version> shipgrade
+> scan`, kept in lockstep with `pyproject` `version` by a test.
 
 ## TLDR
 
 - Current behavior: doc 14 specifies three CI-surface artifacts (spec 6.1, M8). (1) The
   `.shipgrade-ignore.yaml` waiver file lets a risk owner accept a specific finding by its
   stable fingerprint so the CI gate stops failing on a known, reasoned exception, while the
-  finding still shows in the report as accepted risk. (2) The composite `action.yml` wraps
-  `uvx shipgrade scan ... --sarif <file>`, uploads SARIF to the repo Security tab, then
-  exits per the gate. (3) The `.pre-commit-hooks.yaml` ships an offline, key-free local hook
+  finding still shows in the report as accepted risk. (2) The composite `action.yml` installs
+  `uv`, runs `uvx --from shipgrade==<version> shipgrade scan`, uploads SARIF to the repo
+  Security tab, then exits per the gate; it carries an optional `branding:` block (icon
+  `shield`, color `green`) that renders the badge in the Marketplace listing. (3) The
+  `.pre-commit-hooks.yaml` ships an offline, key-free local hook
   for `shipgrade scan`. None of the three adds a probe, OWASP category, model, or `Finding`
   field; each is config or a thin reuse of the existing fingerprint.
 - Core invariants: waivers key on `Finding.fingerprint` only; a waived finding renders as
@@ -110,9 +115,9 @@ and one CLI flag they feed:
   `--ignore-file PATH` (spec 5.6; wired by T8, behavior in doc 12). The composite action
   exposes it as the `ignore-file` input.
 - `action.yml` at the repo root: a composite GitHub Action consumed as
-  `RivetaLabs/Shipgrade@<ref>` in a consumer workflow (spec 6.2, 11.3).
+  `RivetaLabs/shipgrade@<ref>` in a consumer workflow (spec 6.2, 11.3).
 - `.pre-commit-hooks.yaml` at the repo root: the hook manifest a consumer references in
-  their `.pre-commit-config.yaml` as `repo: https://github.com/RivetaLabs/Shipgrade`,
+  their `.pre-commit-config.yaml` as `repo: https://github.com/RivetaLabs/shipgrade`,
   `hooks: [{id: shipgrade}]` (spec 6.2).
 
 ## Output surface

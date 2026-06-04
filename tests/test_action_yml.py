@@ -26,6 +26,48 @@ def test_action_yml_exists_and_is_composite() -> None:
     assert "name" in action and "description" in action
 
 
+def test_action_installs_uv_so_it_is_self_contained() -> None:
+    # The run step uses uvx; bundling setup-uv means a consumer workflow needs only checkout, not a
+    # separate uv install. The step is SHA-pinned by test_every_uses_is_pinned_to_a_40_char_sha.
+    uses = [s["uses"] for s in _steps() if "uses" in s]
+    assert any(u.startswith("astral-sh/setup-uv@") for u in uses)
+
+
+def test_action_pins_shipgrade_to_pyproject_version() -> None:
+    # The wrapper ref (@v0.1.x) pins only the composite YAML; the run step installs the package at
+    # run time. Pin the package to the released version so a consumer pinning the action gets the
+    # matching shipgrade, not whatever is latest on PyPI.
+    import tomllib
+
+    version = tomllib.loads((ACTION_PATH.parent / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]["version"]
+    run_text = "\n".join(s.get("run", "") for s in _steps())
+    assert f"shipgrade=={version}" in run_text
+
+
+# Branding is OPTIONAL per GitHub's metadata docs; it is the badge shown next to the action in the
+# Marketplace listing. The allowed color set is nine values, including black.
+_BRANDING_COLORS = {
+    "white",
+    "black",
+    "yellow",
+    "blue",
+    "green",
+    "orange",
+    "red",
+    "purple",
+    "gray-dark",
+}
+
+
+def test_action_has_marketplace_branding() -> None:
+    branding = _load().get("branding")
+    assert branding is not None, "branding renders the Marketplace badge (listing polish)"
+    assert isinstance(branding["icon"], str) and branding["icon"]
+    assert branding["color"] in _BRANDING_COLORS
+
+
 def test_inputs_are_the_spec_6_2_set() -> None:
     inputs = _load()["inputs"]
     assert set(inputs) == {
@@ -66,12 +108,12 @@ def test_sarif_upload_is_the_pinned_codeql_action_with_if_always() -> None:
     # yaml.safe_load strips the trailing "# v3" inline comment, so the parsed value is the bare
     # owner/repo/path@SHA. The pin must be the exact codeql v3 commit SHA.
     assert (
-        step["uses"] == "github/codeql-action/upload-sarif@03e4368ac7daa2bd82b3e85262f3bf87ee112f57"
+        step["uses"] == "github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463"
     )
     # The "# vX" provenance comment is required by the posture guard (spec 11.3); assert it on
     # the raw text since the parser drops it.
     assert (
-        "github/codeql-action/upload-sarif@03e4368ac7daa2bd82b3e85262f3bf87ee112f57 # v3"
+        "github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v3"
         in ACTION_PATH.read_text(encoding="utf-8")
     )
     # Without always() a failing gate would suppress the very findings the upload exists to
@@ -90,7 +132,7 @@ def test_step_order_is_scan_then_upload_then_gate_exit() -> None:
         if s.get("uses", "").startswith("github/codeql-action/upload-sarif@")
     )
     # The scan step runs uvx shipgrade scan and precedes the upload.
-    scan_idx = next(i for i, s in enumerate(steps) if "uvx shipgrade scan" in s.get("run", ""))
+    scan_idx = next(i for i, s in enumerate(steps) if "shipgrade scan" in s.get("run", ""))
     # The gate-exit step re-emits the scan's captured exit code and is the LAST step, after
     # the upload, so a failing gate never suppresses the SARIF upload (spec 6.2). It is located
     # by the literal `exit "$code"` line, which is unique to that step (the scan step writes
@@ -126,7 +168,7 @@ def _upload_step() -> dict:
 
 
 def _scan_step() -> dict:
-    return next(s for s in _steps() if "uvx shipgrade scan" in s.get("run", ""))
+    return next(s for s in _steps() if "shipgrade scan" in s.get("run", ""))
 
 
 def test_upload_is_gated_on_the_upload_sarif_input() -> None:

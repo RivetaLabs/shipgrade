@@ -404,7 +404,7 @@ def test_assemble_report_builds_the_frozen_report():
         probes_skipped=0,
     )
     metadata = RunMetadata(
-        tool_version="0.1.0",
+        tool_version="0.1.1",
         run_id="r1",
         started_at=datetime(2026, 6, 1, 12, 0, 0),
         target=TargetSummary(mode="prompt_file", identity=_TARGET),
@@ -437,7 +437,7 @@ def test_assemble_report_defaults_errored_probes_to_empty():
         probes_skipped=0,
     )
     metadata = RunMetadata(
-        tool_version="0.1.0",
+        tool_version="0.1.1",
         run_id="r2",
         started_at=datetime(2026, 6, 1, 12, 0, 0),
         target=TargetSummary(mode="prompt_file", identity=_TARGET),

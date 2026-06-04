@@ -48,7 +48,7 @@ def _xss_report() -> Report:
         grade_capped_by_critical=False,
     )
     metadata = RunMetadata(
-        tool_version="0.1.0",
+        tool_version="0.1.1",
         run_id="r",
         started_at=datetime(2026, 6, 1, 12, 0, 0),
         target=TargetSummary(mode="prompt_file", identity="system_prompt.txt"),
@@ -113,4 +113,4 @@ def test_html_footer_carries_the_demo_call_to_action():
     # Share loop (spec 5.10, F-01): a viewer of any shared report is one step from running it.
     html = render_html(make_demo_report())
     assert "uvx shipgrade demo" in html
-    assert "https://github.com/RivetaLabs/Shipgrade" in html
+    assert "https://github.com/RivetaLabs/shipgrade" in html

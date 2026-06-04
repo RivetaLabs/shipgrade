@@ -1,7 +1,7 @@
 ---
 title: Launch Artifacts
-version: 1.1.1
-last_updated: 2026-06-02
+version: 1.2.0
+last_updated: 2026-06-03
 depends_on: [06-demo-app, 02-report-core]
 related: [10-ai-safety-score]
 status: current
@@ -17,7 +17,9 @@ toc: [Public Interface, Output surface, Business Rules, Public boundary verifier
 > `started_at` to `2026-06-01 12:00:00`, so the HTML is byte-identical across runs; the
 > default text demo (no `--format`) is unchanged and stays offline and key-free with its
 > Grade F / 13 / 100 output; the `html` emit branch writes no badge and runs no scan; this
-> feature adds no probe, OWASP category, model, or `Finding` field.
+> feature adds no probe, OWASP category, model, or `Finding` field; the real-world proof
+> gallery under `examples/real-world/` is graded with a judge key at authoring time, committed
+> as static HTML and JSON, and is never read by the offline demo or any CI byte-comparison test.
 
 ## TLDR
 
@@ -27,7 +29,10 @@ toc: [Public Interface, Output surface, Business Rules, Public boundary verifier
   is committed as the byte-identical output of that command and is the standalone proof a
   reader sees without running anything. The README "Sample output" block (spec 11) is the
   unedited `shipgrade demo` stdout, asserted byte-for-byte against the live command in CI, so
-  the HTML, the README block, and the demo all show the same Grade F / 13 / 100 result.
+  the HTML, the README block, and the demo all show the same Grade F / 13 / 100 result. A
+  second artifact, the real-world proof gallery under `examples/real-world/`, grades three
+  regulated-domain prompts (one real CC0-licensed public prompt and two illustrative authored
+  ones) in `prompt_file` mode; it is generated once with a judge key and committed static.
 - Core invariants: the `html` branch reuses `render_html`, never a new renderer; the
   committed sample equals `render_html(make_demo_report())` exactly; the demo is
   deterministic (frozen `started_at`); the default text demo and its snapshot are unchanged;
@@ -82,6 +87,31 @@ The documented regeneration command for the committed deliverable is:
   untouched.
 - An unknown `--format` value is a usage error (`typer.BadParameter`, exit 2), consistent
   with the spec 5.6 exit-code contract.
+
+### Real-world proof gallery (`examples/real-world/`)
+
+A second committed artifact (spec 11.4) demonstrates shipgrade on regulated-domain prompts,
+not just the bundled demo. Layout: `prompts/<slug>.txt` holds each system prompt;
+`configs/<slug>.yaml` is the scan config (`prompt_file` mode, a repo-root-relative `ref`,
+`probe_packs: [owasp-core-v1]`, one domain rule pack, `outputs: [cli, html, json]`);
+`<slug>.html` and `<slug>.json` are the committed graded reports; `README.md` carries the
+provenance table and methodology. Three targets cover the three rule packs: one real,
+CC0-licensed public prompt (`financial-analyst-template`, finance) for provenance and two
+illustrative authored prompts (`health-triage-assistant`, health; `homework-tutor`,
+education) clearly labeled as not real products.
+
+- The gallery is generated once with a judge key (`shipgrade scan` in `prompt_file` mode
+  sends the prompt to a provider), then committed static. It is never wired into the offline
+  `demo`, the demo-grade gate, or any CI byte-comparison test, so no CI test needs a live
+  key and the demo stays offline and key-free.
+- The reports are point-in-time snapshots from a non-deterministic judge; a re-run can
+  differ. They are not asserted byte-stable (unlike `examples/sample-report.html`).
+- Every grade is framed as an automated heuristic audit, not a certification and not a
+  verdict on any product or author. The one real prompt is reproduced under CC0 1.0 with its
+  source URL and retrieval date recorded; the authored prompts are marked illustrative.
+- The gallery ships publicly through the `examples/` whole-directory allowlist (spec 11.2);
+  `tests/test_public_boundary.py` and `scripts/build-public-tree.test.sh` prove it is
+  token-clean and shipping. It adds no probe, OWASP category, model, or `Finding` field.
 
 ## Public boundary verifier
 

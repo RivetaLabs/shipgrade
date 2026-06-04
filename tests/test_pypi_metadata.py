@@ -29,7 +29,9 @@ def test_keywords_are_the_locked_discovery_set():
         "ai-security",
         "prompt-injection",
         "system-prompt-leakage",
+        "owasp",
         "owasp-llm",
+        "compliance",
         "ai-compliance",
         "llm-evaluation",
         "sarif",
@@ -57,15 +59,15 @@ def test_trove_classifiers_are_the_locked_set():
 
 def test_project_urls_cover_docs_source_issues_security_and_no_changelog():
     # Project URLs (spec 11.5). No Changelog URL until CHANGELOG.md is un-deferred, or the
-    # link would 404. The repo path is capitalized `Shipgrade` (spec 11.1); the package
-    # name stays lowercase `shipgrade`.
+    # link would 404. The repo slug is lowercase `shipgrade` (spec 11.1; the public repo was
+    # renamed lowercase on 2026-06-03 to match the package, CLI, and PyPI name).
     project = _load_project()
     urls = project["urls"]
     assert urls == {
-        "Documentation": "https://github.com/RivetaLabs/Shipgrade#readme",
-        "Source": "https://github.com/RivetaLabs/Shipgrade",
-        "Issues": "https://github.com/RivetaLabs/Shipgrade/issues",
-        "Security": "https://github.com/RivetaLabs/Shipgrade/blob/main/SECURITY.md",
+        "Documentation": "https://github.com/RivetaLabs/shipgrade#readme",
+        "Source": "https://github.com/RivetaLabs/shipgrade",
+        "Issues": "https://github.com/RivetaLabs/shipgrade/issues",
+        "Security": "https://github.com/RivetaLabs/shipgrade/blob/main/SECURITY.md",
     }
     assert "Changelog" not in urls
 

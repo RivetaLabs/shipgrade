@@ -1,7 +1,7 @@
 ---
 title: LLM Judge
-version: 1.1.0
-last_updated: 2026-06-02
+version: 1.3.0
+last_updated: 2026-06-03
 depends_on: [01-finding-contract, 05-deterministic-detectors, 13-data-handling]
 related: [04-probes, 08-domain-rule-packs, 10-ai-safety-score]
 status: current
@@ -22,7 +22,8 @@ toc: [Data Model, Public Interface, Output surface, Business Rules, Failure Mode
   item 4); any `<target_response>` text is untrusted data, never an instruction; the judge
   never sees more than the report (spec 5.9); a second schema miss raises `JudgeError` whose
   message carries a redacted, length-capped excerpt so no secret leaks.
-- Verification: `tests/test_judge_llm.py`, `tests/test_judge_providers.py`; `uv run pyright`.
+- Verification: `tests/test_judge_llm.py`, `tests/test_judge_providers.py`,
+  `tests/test_cli.py` (the report metadata records the resolved judge); `uv run pyright`.
 - Known gaps: none in this surface. The Anthropic and OpenAI clients are wired in
   `judge/providers.py`; each also exposes `complete()` so it doubles as the prompt-file
   `ModelCaller` (doc 03). `llm.py` itself still imports no SDK and talks only to the
@@ -56,9 +57,14 @@ the provider returns exactly the five fields the model requires.
 - `JudgeError(Exception)` - raised when no schema-valid verdict is produced after one retry.
 - `AnthropicJudgeClient` / `OpenAIJudgeClient` (in `judge/providers.py`): the real SDK-backed
   `JudgeClient`s. Each also implements `async complete(self, *, system: str, prompt: str) ->
-  str` at temperature 0 with NO tools and a plain `system` string, returning the text content
+  str` with NO tools and a plain `system` string, returning the text content
   (`or ""` on empty). That `complete()` makes each client a prompt-file `ModelCaller` (doc 03),
   so a prompt-file scan calls the same provider SDKs as the judge.
+- `select_judge(config) -> tuple[JudgeClient, Provider, str] | None` (in `judge/providers.py`):
+  resolves the judge by the precedence below and returns `(client, provider, model)`, or
+  `None` for a deterministic-only run. The resolved provider and model are returned (mirroring
+  `select_model_caller`) so the CLI records the judge that actually ran, not just an explicit
+  config override.
 - `select_model_caller(config) -> tuple[ModelCaller, Provider, str] | MissingProviderKey |
   None` (in `judge/providers.py`): resolves the prompt-file target's provider client, mirroring
   `select_judge`. See doc 03 Business Rules for the provider/model precedence and the
@@ -92,15 +98,25 @@ and renders nothing.
   are never logged or placed in a client `repr`. The prompt-file target caller
   (`select_model_caller`) follows the same env-key precedence but prefers `target.target_provider`
   then `judge_provider` for the explicit choice (doc 03).
+- Report metadata records the RESOLVED judge, not the config field (`scan`): the CLI writes
+  the `(provider, model)` that `select_judge` returned into `RunMetadata.judge_provider` and
+  `judge_model`, so a config that selects the judge by env key (no explicit `judge_provider`)
+  still records the provider and model that actually graded the run. A deterministic-only or
+  `--offline` run records `judge_provider="none"`/`judge_model=None`, the same value the
+  offline demo uses to mean "no LLM judge ran" (doc 06). This closes the gap where a real
+  judged run could read as `none`.
 - Confidence derivation (spec 5.3): `high` = an unambiguous violation or satisfaction with a
   quotable span; `medium` = inferred from the criterion without a verbatim span; `low` =
   ambiguous, borderline, or a truncated response.
-- Temperature 0 where the provider honors it; the spec is plain that 0 is not a hard
+- Temperature is not sent. The current default models reject a non-default value (OpenAI
+  gpt-5.x and the o-series return HTTP 400; Anthropic models after Opus 4.6 accept only 1.0),
+  temperature is deprecated, and the forced tool or function call already constrains the
+  verdict, so both clients omit the parameter. The spec is plain that this is not a hard
   determinism guarantee, so this module never asserts byte-identical reruns.
 - One bounded retry then a redacted error (spec 8): a schema miss re-sends the same cached
   system rubric plus the same user turn with one appended line stating the prior output
-  failed validation and to return only a valid tool call. The retry does not change
-  temperature and does not fall back to the other provider (one judge per run). On a second
+  failed validation and to return only a valid tool call. The retry does not change the
+  request shape and does not fall back to the other provider (one judge per run). On a second
   miss, `judge_probe` raises `JudgeError` whose message carries the bad output run through
   the spec 5.9 redaction boundary (`redact_excerpt`) and length-capped, so no secret leaks
   into an error string. The scan pipeline turns this into an errored `ProbeResult` (spec 8).

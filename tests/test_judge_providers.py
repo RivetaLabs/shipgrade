@@ -47,11 +47,13 @@ def test_select_judge_prefers_explicit_then_anthropic_then_openai(monkeypatch):
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-x")
     chosen = select_judge(_config())
-    assert chosen is not None and chosen[1] == "openai"
+    # The 3-tuple carries the resolved provider and model so the CLI records the judge that
+    # actually ran (mirrors select_model_caller).
+    assert chosen is not None and chosen[1] == "openai" and chosen[2] == "gpt-5.5"
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
     chosen = select_judge(_config())
-    assert chosen is not None and chosen[1] == "anthropic"
+    assert chosen is not None and chosen[1] == "anthropic" and chosen[2] == "claude-opus-4-8"
 
     chosen = select_judge(_config(judge_provider="openai"))
     assert chosen is not None and chosen[1] == "openai"
@@ -61,12 +63,12 @@ def test_select_judge_never_puts_key_in_repr(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-supersecret")
     chosen = select_judge(_config())
     assert chosen is not None
-    client, _ = chosen
+    client, _, _ = chosen
     assert "sk-ant-supersecret" not in repr(client)
 
 
 @respx.mock
-def test_anthropic_client_sends_tool_call_at_temp_zero_and_parses_args(monkeypatch):
+def test_anthropic_client_sends_tool_call_and_parses_args(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
     route = respx.post("https://api.anthropic.com/v1/messages").mock(
         return_value=httpx.Response(
@@ -109,7 +111,7 @@ def test_anthropic_client_sends_tool_call_at_temp_zero_and_parses_args(monkeypat
     )
     assert args["passed"] is False and args["confidence"] == "high"
     body = json.loads(route.calls.last.request.content)
-    assert body["temperature"] == 0
+    assert "temperature" not in body
     assert body["system"][0].get("cache_control") == {"type": "ephemeral"}
 
 
@@ -127,7 +129,7 @@ def test_both_judge_clients_are_model_callers(monkeypatch):
 
 
 @respx.mock
-def test_anthropic_complete_sends_plain_system_no_tools_temp_zero(monkeypatch):
+def test_anthropic_complete_sends_plain_system_no_tools_no_temperature(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
     route = respx.post("https://api.anthropic.com/v1/messages").mock(
         return_value=httpx.Response(
@@ -147,14 +149,14 @@ def test_anthropic_complete_sends_plain_system_no_tools_temp_zero(monkeypatch):
     out = asyncio.run(client.complete(system="You are FinBot.", prompt="Should I buy NVDA?"))
     assert out == "Buy NVDA now."
     body = json.loads(route.calls.last.request.content)
-    assert body["temperature"] == 0
+    assert "temperature" not in body
     assert "tools" not in body
     assert body["system"] == "You are FinBot."
     assert body["messages"] == [{"role": "user", "content": "Should I buy NVDA?"}]
 
 
 @respx.mock
-def test_openai_complete_sends_system_and_user_no_tools_temp_zero(monkeypatch):
+def test_openai_complete_sends_system_and_user_no_tools_no_temperature(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-x")
     route = respx.post("https://api.openai.com/v1/chat/completions").mock(
         return_value=httpx.Response(
@@ -178,12 +180,44 @@ def test_openai_complete_sends_system_and_user_no_tools_temp_zero(monkeypatch):
     out = asyncio.run(client.complete(system="You are FinBot.", prompt="Should I buy NVDA?"))
     assert out == "Buy NVDA now."
     body = json.loads(route.calls.last.request.content)
-    assert body["temperature"] == 0
+    assert "temperature" not in body
     assert "tools" not in body
     assert body["messages"] == [
         {"role": "system", "content": "You are FinBot."},
         {"role": "user", "content": "Should I buy NVDA?"},
     ]
+
+
+@respx.mock
+def test_openai_complete_omits_temperature_for_gpt5_5_default(monkeypatch):
+    # gpt-5.x and the o-series reject a non-default temperature on chat.completions (HTTP
+    # 400: "temperature does not support 0"), and gpt-5.5 is the default OpenAI judge model,
+    # so the client must not send temperature or every probe errors. The client omits
+    # temperature for all models (the latest Anthropic and OpenAI defaults both reject it).
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-x")
+    route = respx.post("https://api.openai.com/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl-1",
+                "object": "chat.completion",
+                "created": 1,
+                "model": "gpt-5.5",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "ok"},
+                        "finish_reason": "stop",
+                    }
+                ],
+            },
+        )
+    )
+    client = OpenAIJudgeClient(model="gpt-5.5")
+    out = asyncio.run(client.complete(system="s", prompt="p"))
+    assert out == "ok"
+    body = json.loads(route.calls.last.request.content)
+    assert "temperature" not in body
 
 
 def test_select_model_caller_returns_none_without_any_provider(monkeypatch):
@@ -199,7 +233,7 @@ def test_select_model_caller_env_key_precedence_anthropic_then_openai(monkeypatc
     assert isinstance(chosen, tuple)
     caller, provider, model = chosen
     assert provider == "openai"
-    assert model == "gpt-4.1"
+    assert model == "gpt-5.5"
     assert isinstance(caller, ModelCaller)
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-x")
@@ -207,7 +241,7 @@ def test_select_model_caller_env_key_precedence_anthropic_then_openai(monkeypatc
     assert isinstance(chosen, tuple)
     _, provider, model = chosen
     assert provider == "anthropic"
-    assert model == "claude-sonnet-4-6"
+    assert model == "claude-opus-4-8"
 
 
 def test_select_model_caller_prefers_target_provider_over_judge_and_env(monkeypatch):
@@ -248,7 +282,7 @@ def test_select_model_caller_model_precedence_target_then_judge_then_default(mon
     assert model == "claude-jdg"
     # provider default is last
     _, _, model = _resolved(_config(target_provider="anthropic"))
-    assert model == "claude-sonnet-4-6"
+    assert model == "claude-opus-4-8"
 
 
 def test_select_model_caller_explicit_provider_missing_key_is_a_signal(monkeypatch):

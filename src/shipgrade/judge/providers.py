@@ -1,10 +1,12 @@
 """The real provider clients behind the JudgeClient seam (spec 5.3), plus provider and
-model-caller selection. Each client calls its SDK's tool-use API at temperature 0 for
-judging and exposes a plain complete() at temperature 0 (no tools) that makes it a
-prompt-file ModelCaller (spec 5.1, doc 03). Anthropic marks the rubric system block for
-prompt caching. The SDKs are lazy-imported inside each __init__ so importing this module
-never requires either SDK. Keys are read from the environment by the SDKs and never logged
-or placed in a repr."""
+model-caller selection. Each client calls its SDK's tool-use API for judging and exposes a
+plain complete() (no tools) that makes it a prompt-file ModelCaller (spec 5.1, doc 03). The
+clients do not set temperature: the current default models reject a non-default value (OpenAI
+gpt-5.x and the o-series return HTTP 400; Anthropic models after Opus 4.6 accept only 1.0),
+temperature is deprecated, and the forced tool or function call already constrains the
+verdict. Anthropic marks the rubric system block for prompt caching. The SDKs are
+lazy-imported inside each __init__ so importing this module never requires either SDK. Keys
+are read from the environment by the SDKs and never logged or placed in a repr."""
 
 from __future__ import annotations
 
@@ -17,8 +19,8 @@ from shipgrade.judge.llm import JudgeClient
 from shipgrade.models import Config, Provider
 
 _DEFAULT_MODEL: dict[Provider, str] = {
-    "anthropic": "claude-sonnet-4-6",
-    "openai": "gpt-4.1",
+    "anthropic": "claude-opus-4-8",
+    "openai": "gpt-5.5",
 }
 
 _PROVIDER_KEY_ENV: dict[Provider, str] = {
@@ -52,11 +54,11 @@ class AnthropicJudgeClient:
 
     async def complete(self, *, system: str, prompt: str) -> str:
         """Call the model as the prompt-file target: the system prompt under test as the
-        system message, the probe input as the one user message, temperature 0, no tools."""
+        system message, the probe input as the one user message, no tools (see the module
+        docstring for why temperature is unset)."""
         msg = await self._client.messages.create(
             model=self._model,
             max_tokens=1024,
-            temperature=0,
             system=system,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -72,7 +74,6 @@ class AnthropicJudgeClient:
         msg = await self._client.messages.create(
             model=self._model,
             max_tokens=1024,
-            temperature=0,
             system=cast(Any, cached),
             tools=[cast(Any, tool_schema)],
             tool_choice={"type": "tool", "name": tool_schema["name"]},
@@ -98,10 +99,10 @@ class OpenAIJudgeClient:
 
     async def complete(self, *, system: str, prompt: str) -> str:
         """Call the model as the prompt-file target: the system prompt under test as the
-        system message, the probe input as the user message, temperature 0, no tools."""
+        system message, the probe input as the user message, no tools (see the module
+        docstring for why temperature is unset)."""
         resp = await self._client.chat.completions.create(
             model=self._model,
-            temperature=0,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
@@ -125,7 +126,6 @@ class OpenAIJudgeClient:
         }
         resp = await self._client.chat.completions.create(
             model=self._model,
-            temperature=0,
             tools=[cast(Any, fn)],
             tool_choice={"type": "function", "function": {"name": tool_schema["name"]}},
             messages=[
@@ -142,11 +142,13 @@ class OpenAIJudgeClient:
         raise ValueError("openai judge returned no tool call")
 
 
-def select_judge(config: Config) -> tuple[JudgeClient, Provider] | None:
+def select_judge(config: Config) -> tuple[JudgeClient, Provider, str] | None:
     """Resolve the judge by precedence: explicit config.judge_provider wins; else
     ANTHROPIC_API_KEY selects anthropic; else OPENAI_API_KEY selects openai; else None
     (the run stays deterministic-only). Both keys with no explicit choice resolves to
-    anthropic. The chosen model is config.judge_model or the provider default."""
+    anthropic. The chosen model is config.judge_model or the provider default. The resolved
+    provider and model are returned (mirroring select_model_caller) so the CLI records the
+    judge that actually ran in the report metadata, not just an explicit config override."""
     provider: Provider | None = config.judge_provider
     if provider is None:
         if os.environ.get("ANTHROPIC_API_KEY"):
@@ -161,7 +163,7 @@ def select_judge(config: Config) -> tuple[JudgeClient, Provider] | None:
         client = AnthropicJudgeClient(model=model)
     else:
         client = OpenAIJudgeClient(model=model)
-    return client, provider
+    return client, provider, model
 
 
 def select_model_caller(

@@ -1,0 +1,20 @@
+# Real-world gallery target: a community-contributed "Financial Analyst" prompt (CC0 1.0)
+# used as a finance assistant's system prompt. Provenance is in ../README.md.
+# Run from the repo root so the prompt-file ref resolves:
+#   shipgrade scan --config examples/real-world/configs/financial-analyst-template.yaml
+target:
+  mode: prompt_file
+  ref: examples/real-world/prompts/financial-analyst-template.txt
+probe_packs:
+  - owasp-core-v1
+# owasp-core-v1 bundles probes that bind finance, health, and education rules, so all three
+# packs load (the same pairing as `shipgrade init`); finance is the domain in focus here.
+rule_packs:
+  - finance-v1
+  - health-v1
+  - edu-v1
+outputs:
+  - cli
+  - html
+  - json
+gate_severity: 7.0

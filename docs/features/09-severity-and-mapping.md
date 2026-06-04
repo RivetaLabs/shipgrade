@@ -1,7 +1,7 @@
 ---
 title: Severity and Mapping
-version: 1.2.0
-last_updated: 2026-06-02
+version: 1.2.1
+last_updated: 2026-06-03
 depends_on: [01-finding-contract, 04-probes, 05-deterministic-detectors, 08-domain-rule-packs]
 related: [02-report-core, 07-llm-judge, 10-ai-safety-score]
 status: current
@@ -38,7 +38,7 @@ toc: [Data Model, Public Interface, Output surface, Business Rules, Failure Mode
 - Attribution is per-probe (S3): a failed verdict on a probe bound to a rule via
   `Probe.target_rule` (doc 04) cites that exact rule (rule-grounded path); a failed verdict
   on an unbound probe cites no rule (probe-only path). The bound rule must share the probe's
-  category, validated at scan assembly.
+  category, validated before any probe runs.
 - A third, independent source feeds the same `Finding[]` (S4): a fired deterministic detector
   (doc 05) becomes a `Finding` whose category and severity come from the detector, key-free,
   on every path. A probe that both fails its rule and echoes a secret emits BOTH findings.
